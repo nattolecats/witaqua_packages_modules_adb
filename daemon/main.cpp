@@ -221,8 +221,16 @@ int adbd_main() {
 
 #if defined(__ANDROID__)
     bool device_unlocked = android::base::GetProperty("ro.boot.verifiedbootstate", "") == "orange";
-    if (device_unlocked || ANDROID_DEBUGGABLE || __android_log_is_debuggable()) {
-        // If we're on userdebug/eng or the device is unlocked, permit no-authentication.
+    // ro.adb.secure is normally only trusted on userdebug/eng or an unlocked
+    // bootloader. A build can still explicitly request insecure adb (e.g. via
+    // WITH_ADB_INSECURE) while otherwise reporting itself as a non-debuggable
+    // "user" build for attestation purposes; honor that explicit opt-out too.
+    bool adb_insecure_requested =
+            !android::base::GetBoolProperty("ro.adb.secure", true);
+    if (device_unlocked || adb_insecure_requested || ANDROID_DEBUGGABLE ||
+        __android_log_is_debuggable()) {
+        // If we're on userdebug/eng, the device is unlocked, or ro.adb.secure
+        // was explicitly cleared, permit no-authentication.
         auth_required = android::base::GetBoolProperty("ro.adb.secure", false);
 #if defined(__ANDROID_RECOVERY__)
         auth_required &= android::base::GetBoolProperty("ro.adb.secure.recovery", true);
